@@ -63,6 +63,13 @@
             font-weight: 600;
         }
 
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
         .search-box {
             width: 100%;
             padding: 12px;
@@ -72,12 +79,23 @@
             color: var(--text-color);
             font-size: 16px;
             box-sizing: border-box;
-            margin-bottom: 20px;
         }
 
         .search-box:focus {
             outline: none;
             border-color: var(--primary-color);
+        }
+
+        .backup-upload {
+            background: rgba(0, 0, 0, 0.03);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px dashed var(--border-color);
+            font-size: 14px;
+        }
+
+        [data-theme="dark"] .backup-upload {
+            background: rgba(255, 255, 255, 0.03);
         }
 
         .meta-info {
@@ -125,69 +143,8 @@
         <button class="theme-btn" id="themeToggle">Chế độ Tối 🌙</button>
     </div>
 
-    <input type="text" id="search_input" class="search-box" placeholder="Nhập từ khóa bất kỳ (Tên, Mã số, Phòng ban...) để tìm kiếm..." disabled />
-    
-    <div id="meta_info" class="meta-info"></div>
-
-    <div style="overflow-x: auto; max-height: 600px;">
-        <table id="data_table" style="display: none;">
-            <thead id="table_head"></thead>
-            <tbody id="table_body"></tbody>
-        </table>
-        <div id="status_message" class="status">🔄 Đang đồng bộ dữ liệu từ đám mây...</div>
-    </div>
-</div>
-
-<script>
-    let masterData = []; // Mảng gộp tất cả dữ liệu từ các sheet
-    let tableHeaders = new Set(); // Dùng Set để gom toàn bộ các tiêu đề cột duy nhất
-
-    const searchInput = document.getElementById('search_input');
-    const dataTable = document.getElementById('data_table');
-    const tableHead = document.getElementById('table_head');
-    const tableBody = document.getElementById('table_body');
-    const statusMessage = document.getElementById('status_message');
-    const metaInfo = document.getElementById('meta_info');
-    const themeToggle = document.getElementById('themeToggle');
-
-    // 1. GIAO DIỆN CÁ NHÂN HÓA
-    const currentTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', currentTheme);
-    themeToggle.textContent = currentTheme === 'dark' ? 'Chế độ Sáng ☀️' : 'Chế độ Tối 🌙';
-
-    themeToggle.addEventListener('click', () => {
-        let theme = document.documentElement.getAttribute('data-theme');
-        let newTheme = theme === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        themeToggle.textContent = newTheme === 'dark' ? 'Chế độ Sáng ☀️' : 'Chế độ Tối 🌙';
-    });
-
-    // 2. TỰ ĐỘNG ĐỌC FILE EXCEL (TẤT CẢ CÁC WORKBOOK / SHEET)
-    window.addEventListener('DOMContentLoaded', () => {
-        // Gọi file dữ liệu cố định trên host
-        fetch('data.xlsx') 
-            .then(res => {
-                if (!res.ok) throw new Error("Không tìm thấy file data.xlsx trên máy chủ!");
-                return res.arrayBuffer();
-            })
-            .then(ab => {
-                const data = new Uint8Array(ab);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                let totalRowsFetched = 0;
-
-                // VÒNG LẶP: Quét qua từng Sheet có trong file Excel
-                workbook.SheetNames.forEach(sheetName => {
-                    const worksheet = workbook.Sheets[sheetName];
-                    // Chuyển sheet hiện tại thành JSON
-                    const sheetJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-                    
-                    if (sheetJson.length > 0) {
-                        totalRowsFetched += sheetJson.length;
-                        
-                        // Lấy cấu trúc các cột của sheet này gom vào danh sách header chung
-                        Object.keys(sheetJson[0]).forEach(h => tableHeaders.add(h));
-                        
-                        // Đánh dấu dòng này thuộc Sheet nào (tiện quản lý nếu cần)
-                        sheetJson.
+    <div class="control-panel">
+        <input type="text" id="search_input" class="search-box" placeholder="Nhập từ khóa bất kỳ (Tên, Mã số, Phòng ban...) để tìm kiếm..." disabled />
+        
+        <div class="backup-upload" id="upload_panel">
+            💡 <b>Mẹo chạy thử dưới máy:</b> Nếu chưa
