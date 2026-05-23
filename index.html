@@ -63,6 +63,13 @@
             font-weight: 600;
         }
 
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
         .search-box {
             width: 100%;
             padding: 12px;
@@ -72,12 +79,23 @@
             color: var(--text-color);
             font-size: 16px;
             box-sizing: border-box;
-            margin-bottom: 20px;
         }
 
         .search-box:focus {
             outline: none;
             border-color: var(--primary-color);
+        }
+
+        .backup-upload {
+            background: rgba(0, 0, 0, 0.03);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px dashed var(--border-color);
+            font-size: 14px;
+        }
+
+        [data-theme="dark"] .backup-upload {
+            background: rgba(255, 255, 255, 0.03);
         }
 
         .meta-info {
@@ -125,7 +143,14 @@
         <button class="theme-btn" id="themeToggle">Chế độ Tối 🌙</button>
     </div>
 
-    <input type="text" id="search_input" class="search-box" placeholder="Nhập từ khóa bất kỳ (Tên, Mã số, Phòng ban...) để tìm kiếm..." disabled />
+    <div class="control-panel">
+        <input type="text" id="search_input" class="search-box" placeholder="Nhập từ khóa bất kỳ (Tên, Mã số, Phòng ban...) để tìm kiếm..." disabled />
+        
+        <div class="backup-upload" id="upload_panel">
+            💡 <b>Mẹo:</b> Nếu hệ thống không tự động tải được file (khi chạy local trên máy), hãy chọn file Excel của bạn tại đây: 
+            <input type="file" id="excel_file_input" accept=".xlsx, .xls" style="margin-left: 10px;" />
+        </div>
+    </div>
     
     <div id="meta_info" class="meta-info"></div>
 
@@ -134,15 +159,17 @@
             <thead id="table_head"></thead>
             <tbody id="table_body"></tbody>
         </table>
-        <div id="status_message" class="status">🔄 Đang đồng bộ dữ liệu từ đám mây...</div>
+        <div id="status_message" class="status">🔄 Đang tự động kết nối dữ liệu từ đám mây...</div>
     </div>
 </div>
 
 <script>
-    let masterData = []; // Mảng gộp tất cả dữ liệu từ các sheet
-    let tableHeaders = new Set(); // Dùng Set để gom toàn bộ các tiêu đề cột duy nhất
+    let masterData = []; 
+    let tableHeaders = new Set(); 
 
     const searchInput = document.getElementById('search_input');
+    const excelFileInput = document.getElementById('excel_file_input');
+    const uploadPanel = document.getElementById('upload_panel');
     const dataTable = document.getElementById('data_table');
     const tableHead = document.getElementById('table_head');
     const tableBody = document.getElementById('table_body');
@@ -163,31 +190,116 @@
         themeToggle.textContent = newTheme === 'dark' ? 'Chế độ Sáng ☀️' : 'Chế độ Tối 🌙';
     });
 
-    // 2. TỰ ĐỘNG ĐỌC FILE EXCEL (TẤT CẢ CÁC WORKBOOK / SHEET)
+    // Hàm xử lý dữ liệu nhị phân từ file Excel thành JSON chung
+    function processExcelData(arrayBuffer) {
+        try {
+            const data = new Uint8Array(arrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            masterData = [];
+            tableHeaders = new Set();
+            let totalRowsFetched = 0;
+
+            workbook.SheetNames.forEach(sheetName => {
+                const worksheet = workbook.Sheets[sheetName];
+                const sheetJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                
+                if (sheetJson.length > 0) {
+                    totalRowsFetched += sheetJson.length;
+                    Object.keys(sheetJson[0]).forEach(h => tableHeaders.add(h));
+                    
+                    sheetJson.forEach(row => {
+                        row["Nguồn (Sheet)"] = sheetName; 
+                        masterData.push(row);
+                    });
+                }
+            });
+
+            tableHeaders.add("Nguồn (Sheet)");
+            const headersArray = Array.from(tableHeaders);
+
+            if (masterData.length > 0) {
+                statusMessage.style.display = 'none';
+                dataTable.style.display = 'table';
+                searchInput.disabled = false;
+                uploadPanel.style.display = 'none'; // Ẩn nút upload dự phòng nếu đã tải thành công
+                metaInfo.innerHTML = `📊 Đã kết nối <b>${workbook.SheetNames.length}</b> trang tính. Tổng số dữ liệu: <b>${totalRowsFetched}</b> dòng.`;
+                
+                renderTable(masterData, headersArray);
+            } else {
+                showError("File Excel trống hoặc không có dữ liệu hợp lệ.");
+            }
+        } catch (err) {
+            showError("Có lỗi xảy ra khi xử lý cấu trúc file Excel: " + err.message);
+        }
+    }
+
+    function showError(msg) {
+        statusMessage.style.display = 'block';
+        statusMessage.innerHTML = `<span style="color:#d32f2f; font-weight:600;">⚠️ ${msg}</span>`;
+        dataTable.style.display = 'none';
+        searchInput.disabled = true;
+    }
+
+    // 2. KỊCH BẢN TỰ ĐỘNG (Dùng khi đã đưa lên Web công khai)
     window.addEventListener('DOMContentLoaded', () => {
-        // Gọi file dữ liệu cố định trên host
         fetch('data.xlsx') 
             .then(res => {
-                if (!res.ok) throw new Error("Không tìm thấy file data.xlsx trên máy chủ!");
+                if (!res.ok) throw new Error("Không thể tìm thấy file data.xlsx trên máy chủ.");
                 return res.arrayBuffer();
             })
             .then(ab => {
-                const data = new Uint8Array(ab);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                let totalRowsFetched = 0;
+                processExcelData(ab);
+            })
+            .catch(err => {
+                // Nếu tự động load thất bại (Ví dụ lỗi CORS khi chạy local file:///)
+                statusMessage.innerHTML = `
+                    <span style="color:#e67e22; font-weight:600;">ℹ️ Hệ thống đang chạy ở môi trường máy cá nhân (Local)</span><br>
+                    <small style="color:#888;">Để tự động đồng bộ dữ liệu, hãy nhấn 'Go Live' trên VS Code hoặc đẩy dự án lên GitHub Pages.<br>
+                    Hiện tại, bạn có thể sử dụng hộp chọn file ở trên để kiểm tra giao diện.</small>
+                `;
+            });
+    });
 
-                // VÒNG LẶP: Quét qua từng Sheet có trong file Excel
-                workbook.SheetNames.forEach(sheetName => {
-                    const worksheet = workbook.Sheets[sheetName];
-                    // Chuyển sheet hiện tại thành JSON
-                    const sheetJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-                    
-                    if (sheetJson.length > 0) {
-                        totalRowsFetched += sheetJson.length;
-                        
-                        // Lấy cấu trúc các cột của sheet này gom vào danh sách header chung
-                        Object.keys(sheetJson[0]).forEach(h => tableHeaders.add(h));
-                        
-                        // Đánh dấu dòng này thuộc Sheet nào (tiện quản lý nếu cần)
-                        sheetJson.
+    // 3. KỊCH BẢN DỰ PHÒNG (Cho phép người dùng tự tay chọn file trực tiếp dưới máy)
+    excelFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        statusMessage.innerHTML = "🔄 Đang phân tích file được chọn...";
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        reader.onload = function (e) {
+            processExcelData(e.target.result);
+        };
+    });
+
+    // 4. VẼ BẢNG HIỂN THỊ DỮ LIỆU
+    function renderTable(data, headers) {
+        tableHead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+        
+        if (data.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center; color:#999; font-style:italic;">Không tìm thấy kết quả phù hợp</td></tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = data.map(row => {
+            return `<tr>${headers.map(h => `<td>${row[h] || ""}</td>`).join('')}</tr>`;
+        }).join('');
+    }
+
+    // 5. BỘ LỌC TÌM KIẾM TOÀN DIỆN
+    searchInput.addEventListener('input', (e) => {
+        const keyword = e.target.value.toLowerCase().trim();
+        const headersArray = Array.from(tableHeaders);
+
+        const filtered = masterData.filter(row => {
+            return headersArray.some(h => String(row[h]).toLowerCase().includes(keyword));
+        });
+
+        renderTable(filtered, headersArray);
+    });
+</script>
+
+</body>
+</html>
