@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Tra Cứu Nhân Sự Toàn Diện</title>
+    <title>Hệ Thống Tra Cứu Nhân Sự Tốc Độ Cao</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -15,291 +15,127 @@
             --table-header: #34495e;
             --table-striped: #f9f9f9;
         }
-
-        [data-theme="dark"] {
-            --bg-color: #121212;
-            --container-bg: #1e1e1e;
-            --text-color: #e0e0e0;
-            --border-color: #333333;
-            --primary-color: #2980b9;
-            --table-header: #2980b9;
-            --table-striped: #2b2b2b;
-        }
-
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
             padding: 20px;
-            transition: all 0.3s ease;
         }
-
         .container {
-            max-width: 1100px;
+            max-width: 1200px;
             margin: 0 auto;
             background: var(--container-bg);
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
-
-        .header-box {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-
-        .theme-btn {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 18px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .control-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
         .search-box {
             width: 100%;
             padding: 12px;
             border: 2px solid var(--border-color);
             border-radius: 8px;
-            background-color: var(--container-bg);
-            color: var(--text-color);
             font-size: 16px;
             box-sizing: border-box;
+            margin-bottom: 15px;
         }
-
-        .search-box:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
-
-        .backup-upload {
-            background: rgba(0, 0, 0, 0.03);
+        .backup-panel {
+            background: #fff3cd;
+            color: #856404;
             padding: 12px;
             border-radius: 8px;
-            border: 1px dashed var(--border-color);
-            font-size: 14px;
-        }
-
-        [data-theme="dark"] .backup-upload {
-            background: rgba(255, 255, 255, 0.03);
-        }
-
-        .meta-info {
+            border: 1px solid #ffeeba;
             font-size: 14px;
             margin-bottom: 15px;
-            color: #666;
         }
-
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
         }
-
         th, td {
             border: 1px solid var(--border-color);
-            padding: 12px;
+            padding: 10px 12px;
             text-align: left;
+            font-size: 14px;
         }
-
         th {
             background-color: var(--table-header);
             color: white;
             position: sticky;
             top: 0;
         }
-
         tr:nth-child(even) {
             background-color: var(--table-striped);
         }
-
         .status {
             text-align: center;
-            padding: 40px;
-            font-size: 18px;
-            color: #888;
+            padding: 20px;
+            font-size: 16px;
+            color: #666;
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header-box">
-        <h2>Cổng Tra Cứu Thông Tin Nội Bộ</h2>
-        <button class="theme-btn" id="themeToggle">Chế độ Tối 🌙</button>
-    </div>
-
-    <div class="control-panel">
-        <input type="text" id="search_input" class="search-box" placeholder="Nhập từ khóa bất kỳ (Tên, Mã số, Phòng ban...) để tìm kiếm..." disabled />
-        
-        <div class="backup-upload" id="upload_panel">
-            💡 <b>Mẹo:</b> Nếu hệ thống không tự động tải được file (khi chạy local trên máy), hãy chọn file Excel của bạn tại đây: 
-            <input type="file" id="excel_file_input" accept=".xlsx, .xls" style="margin-left: 10px;" />
-        </div>
+    <h2>Cổng Tra Cứu Thông Tin Nội Bộ (Tối Ưu Tốc Độ)</h2>
+    
+    <input type="text" id="search_input" class="search-box" placeholder="Nhập từ khóa bất kỳ để tìm kiếm ngay..." />
+    
+    <div class="backup-panel" id="upload_panel">
+        📁 <b>Dự phòng:</b> Nếu hệ thống chưa tải được file tự động từ server, hãy chọn file Excel từ máy tính: 
+        <input type="file" id="excel_file_input" accept=".xlsx, .xls" style="margin-left: 10px;" />
     </div>
     
-    <div id="meta_info" class="meta-info"></div>
+    <div id="status_message" class="status">🔄 Đang tải file dữ liệu ngầm từ đám mây...</div>
 
-    <div style="overflow-x: auto; max-height: 600px;">
+    <div style="overflow-x: auto; max-height: 550px;">
         <table id="data_table" style="display: none;">
             <thead id="table_head"></thead>
             <tbody id="table_body"></tbody>
         </table>
-        <div id="status_message" class="status">🔄 Đang tự động kết nối dữ liệu từ đám mây...</div>
     </div>
 </div>
 
 <script>
     let masterData = []; 
     let tableHeaders = new Set(); 
+    let searchTimeout = null; // Dùng để hoãn tìm kiếm (Debounce) giúp gõ phím mượt hơn
 
     const searchInput = document.getElementById('search_input');
     const excelFileInput = document.getElementById('excel_file_input');
-    const uploadPanel = document.getElementById('upload_panel');
     const dataTable = document.getElementById('data_table');
     const tableHead = document.getElementById('table_head');
     const tableBody = document.getElementById('table_body');
     const statusMessage = document.getElementById('status_message');
-    const metaInfo = document.getElementById('meta_info');
-    const themeToggle = document.getElementById('themeToggle');
 
-    // 1. GIAO DIỆN CÁ NHÂN HÓA
-    const currentTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', currentTheme);
-    themeToggle.textContent = currentTheme === 'dark' ? 'Chế độ Sáng ☀️' : 'Chế độ Tối 🌙';
+    // -------------------------------------------------------------
+    // TẠO THUẬT TOÁN CHẠY NGẦM (WEB WORKER CODE)
+    // -------------------------------------------------------------
+    const workerCode = function() {
+        // Nạp thư viện xlsx vào luồng ngầm
+        importScripts('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
 
-    themeToggle.addEventListener('click', () => {
-        let theme = document.documentElement.getAttribute('data-theme');
-        let newTheme = theme === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        themeToggle.textContent = newTheme === 'dark' ? 'Chế độ Sáng ☀️' : 'Chế độ Tối 🌙';
-    });
-
-    // Hàm xử lý dữ liệu nhị phân từ file Excel thành JSON chung
-    function processExcelData(arrayBuffer) {
-        try {
-            const data = new Uint8Array(arrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            
-            masterData = [];
-            tableHeaders = new Set();
-            let totalRowsFetched = 0;
-
-            workbook.SheetNames.forEach(sheetName => {
-                const worksheet = workbook.Sheets[sheetName];
-                const sheetJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+        self.onmessage = function(e) {
+            try {
+                const arrayBuffer = e.data;
+                const data = new Uint8Array(arrayBuffer);
+                // Đọc file với cấu trúc tối giản để tăng tốc độ xử lý phần cứng
+                const workbook = XLSX.read(data, { type: 'array', Sheets: [] });
                 
-                if (sheetJson.length > 0) {
-                    totalRowsFetched += sheetJson.length;
-                    Object.keys(sheetJson[0]).forEach(h => tableHeaders.add(h));
+                let localMasterData = [];
+                let localHeaders = new Set();
+                let totalRows = 0;
+
+                workbook.SheetNames.forEach(sheetName => {
+                    const worksheet = workbook.Sheets[sheetName];
+                    // Tối ưu chuyển đổi sang JSON nhanh bằng defval trống
+                    const sheetJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                     
-                    sheetJson.forEach(row => {
-                        row["Nguồn (Sheet)"] = sheetName; 
-                        masterData.push(row);
-                    });
-                }
-            });
-
-            tableHeaders.add("Nguồn (Sheet)");
-            const headersArray = Array.from(tableHeaders);
-
-            if (masterData.length > 0) {
-                statusMessage.style.display = 'none';
-                dataTable.style.display = 'table';
-                searchInput.disabled = false;
-                uploadPanel.style.display = 'none'; // Ẩn nút upload dự phòng nếu đã tải thành công
-                metaInfo.innerHTML = `📊 Đã kết nối <b>${workbook.SheetNames.length}</b> trang tính. Tổng số dữ liệu: <b>${totalRowsFetched}</b> dòng.`;
-                
-                renderTable(masterData, headersArray);
-            } else {
-                showError("File Excel trống hoặc không có dữ liệu hợp lệ.");
-            }
-        } catch (err) {
-            showError("Có lỗi xảy ra khi xử lý cấu trúc file Excel: " + err.message);
-        }
-    }
-
-    function showError(msg) {
-        statusMessage.style.display = 'block';
-        statusMessage.innerHTML = `<span style="color:#d32f2f; font-weight:600;">⚠️ ${msg}</span>`;
-        dataTable.style.display = 'none';
-        searchInput.disabled = true;
-    }
-
-    // 2. KỊCH BẢN TỰ ĐỘNG (Dùng khi đã đưa lên Web công khai)
-    window.addEventListener('DOMContentLoaded', () => {
-        fetch('data.xlsx') 
-            .then(res => {
-                if (!res.ok) throw new Error("Không thể tìm thấy file data.xlsx trên máy chủ.");
-                return res.arrayBuffer();
-            })
-            .then(ab => {
-                processExcelData(ab);
-            })
-            .catch(err => {
-                // Nếu tự động load thất bại (Ví dụ lỗi CORS khi chạy local file:///)
-                statusMessage.innerHTML = `
-                    <span style="color:#e67e22; font-weight:600;">ℹ️ Hệ thống đang chạy ở môi trường máy cá nhân (Local)</span><br>
-                    <small style="color:#888;">Để tự động đồng bộ dữ liệu, hãy nhấn 'Go Live' trên VS Code hoặc đẩy dự án lên GitHub Pages.<br>
-                    Hiện tại, bạn có thể sử dụng hộp chọn file ở trên để kiểm tra giao diện.</small>
-                `;
-            });
-    });
-
-    // 3. KỊCH BẢN DỰ PHÒNG (Cho phép người dùng tự tay chọn file trực tiếp dưới máy)
-    excelFileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        statusMessage.innerHTML = "🔄 Đang phân tích file được chọn...";
-        const reader = new FileReader();
-        reader.readAsArrayBuffer(file);
-        reader.onload = function (e) {
-            processExcelData(e.target.result);
-        };
-    });
-
-    // 4. VẼ BẢNG HIỂN THỊ DỮ LIỆU
-    function renderTable(data, headers) {
-        tableHead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
-        
-        if (data.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center; color:#999; font-style:italic;">Không tìm thấy kết quả phù hợp</td></tr>`;
-            return;
-        }
-
-        tableBody.innerHTML = data.map(row => {
-            return `<tr>${headers.map(h => `<td>${row[h] || ""}</td>`).join('')}</tr>`;
-        }).join('');
-    }
-
-    // 5. BỘ LỌC TÌM KIẾM TOÀN DIỆN
-    searchInput.addEventListener('input', (e) => {
-        const keyword = e.target.value.toLowerCase().trim();
-        const headersArray = Array.from(tableHeaders);
-
-        const filtered = masterData.filter(row => {
-            return headersArray.some(h => String(row[h]).toLowerCase().includes(keyword));
-        });
-
-        renderTable(filtered, headersArray);
-    });
-</script>
-
-</body>
-</html>
+                    if (sheetJson.length > 0) {
+                        totalRows += sheetJson.length;
+                        Object.keys(sheetJson[0]).forEach(h => localHeaders.add(h));
+                        
+                        //
