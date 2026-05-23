@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Tra Cứu Nhân Sự Toàn Diện</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --container-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #dddddd;
+            --primary-color: #2c3e50;
+            --table-header: #34495e;
+            --table-striped: #f9f9f9;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #121212;
+            --container-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --border-color: #333333;
+            --primary-color: #2980b9;
+            --table-header: #2980b9;
+            --table-striped: #2b2b2b;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: var(--container-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .header-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .theme-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--container-bg);
+            color: var(--text-color);
+            font-size: 16px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .meta-info {
+            font-size: 14px;
+            margin-bottom: 15px;
+            color: #666;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--table-header);
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:nth-child(even) {
+            background-color: var(--table-striped);
+        }
+
+        .status {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-box">
+        <h2>Cổng Tra Cứu Thông Tin Nội Bộ</h2>
+        <button class="theme-btn" id="themeToggle">Chế độ Tối 🌙</button>
+    </div>
+
+    <input type="text" id="search_input" class="search-box" placeholder="Nhập từ khóa bất kỳ (Tên, Mã số, Phòng ban...) để tìm kiếm..." disabled />
+    
+    <div id="meta_info" class="meta-info"></div>
+
+    <div style="overflow-x: auto; max-height: 600px;">
+        <table id="data_table" style="display: none;">
+            <thead id="table_head"></thead>
+            <tbody id="table_body"></tbody>
+        </table>
+        <div id="status_message" class="status">🔄 Đang đồng bộ dữ liệu từ đám mây...</div>
+    </div>
+</div>
+
+<script>
+    let masterData = []; // Mảng gộp tất cả dữ liệu từ các sheet
+    let tableHeaders = new Set(); // Dùng Set để gom toàn bộ các tiêu đề cột duy nhất
+
+    const searchInput = document.getElementById('search_input');
+    const dataTable = document.getElementById('data_table');
+    const tableHead = document.getElementById('table_head');
+    const tableBody = document.getElementById('table_body');
+    const statusMessage = document.getElementById('status_message');
+    const metaInfo = document.getElementById('meta_info');
+    const themeToggle = document.getElementById('themeToggle');
+
+    // 1. GIAO DIỆN CÁ NHÂN HÓA
+    const currentTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    themeToggle.textContent = currentTheme === 'dark' ? 'Chế độ Sáng ☀️' : 'Chế độ Tối 🌙';
+
+    themeToggle.addEventListener('click', () => {
+        let theme = document.documentElement.getAttribute('data-theme');
+        let newTheme = theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        themeToggle.textContent = newTheme === 'dark' ? 'Chế độ Sáng ☀️' : 'Chế độ Tối 🌙';
+    });
+
+    // 2. TỰ ĐỘNG ĐỌC FILE EXCEL (TẤT CẢ CÁC WORKBOOK / SHEET)
+    window.addEventListener('DOMContentLoaded', () => {
+        // Gọi file dữ liệu cố định trên host
+        fetch('data.xlsx') 
+            .then(res => {
+                if (!res.ok) throw new Error("Không tìm thấy file data.xlsx trên máy chủ!");
+                return res.arrayBuffer();
+            })
+            .then(ab => {
+                const data = new Uint8Array(ab);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                let totalRowsFetched = 0;
+
+                // VÒNG LẶP: Quét qua từng Sheet có trong file Excel
+                workbook.SheetNames.forEach(sheetName => {
+                    const worksheet = workbook.Sheets[sheetName];
+                    // Chuyển sheet hiện tại thành JSON
+                    const sheetJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    
+                    if (sheetJson.length > 0) {
+                        totalRowsFetched += sheetJson.length;
+                        
+                        // Lấy cấu trúc các cột của sheet này gom vào danh sách header chung
+                        Object.keys(sheetJson[0]).forEach(h => tableHeaders.add(h));
+                        
+                        // Đánh dấu dòng này thuộc Sheet nào (tiện quản lý nếu cần)
+                        sheetJson.
